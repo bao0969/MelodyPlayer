@@ -10,8 +10,8 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.melodyplayer.auth.AuthScreen
 import com.example.melodyplayer.home.HomeScreen
-import com.example.melodyplayer.login.LoginScreen
 import com.example.melodyplayer.navigation.Routes
 import com.example.melodyplayer.player.MusicPlayerScreen
 import com.example.melodyplayer.player.PlayerViewModel
@@ -22,7 +22,6 @@ import com.example.melodyplayer.ui.theme.MelodyPlayerTheme
 import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
-
     private val playerVM: PlayerViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,13 +43,17 @@ fun MainApp(playerVM: PlayerViewModel) {
     NavHost(
         navController = navController,
         startDestination = if (FirebaseAuth.getInstance().currentUser == null) {
-            Routes.LOGIN
+            Routes.AUTH
         } else {
             Routes.HOME
         }
     ) {
-        composable(Routes.LOGIN) {
-            LoginScreen(navController = navController)
+        composable(Routes.AUTH) {
+            AuthScreen(onLoginSuccess = {
+                navController.navigate(Routes.HOME) {
+                    popUpTo(Routes.AUTH) { inclusive = true }
+                }
+            })
         }
         composable(Routes.HOME) {
             HomeScreen(navController = navController, playerVM = playerVM)

@@ -1,6 +1,7 @@
 package com.example.melodyplayer.navigation
 
 object Routes {
+    const val AUTH = "auth"      // ✅ ADDED
     const val LOGIN = "login"
     const val HOME = "home"
     const val PLAYER = "player"
