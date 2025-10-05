@@ -1,11 +1,14 @@
+/*
 import com.example.melodyplayer.model.Song
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 
+*/
 /**
  * Helper seed data to quickly populate Firestore with valid streaming URLs.
- */
+ *//*
+
 object SongSeedData {
     val sampleSongs: List<Song> = listOf(
         Song(
@@ -50,4 +53,4 @@ object SongSeedData {
         val normalized = rawId.replace(Regex("[^a-z0-9]+"), "-").trim('-')
         return normalized.ifBlank { song.title.hashCode().toString() }
     }
-}
+}*/

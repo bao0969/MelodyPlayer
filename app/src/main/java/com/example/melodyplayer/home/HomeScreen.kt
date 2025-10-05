@@ -1,6 +1,5 @@
 package com.example.melodyplayer.home
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,24 +15,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
+import com.example.melodyplayer.R
 import com.example.melodyplayer.model.Song
 import com.example.melodyplayer.navigation.Routes
 import com.example.melodyplayer.player.MiniPlayer
 import com.example.melodyplayer.player.PlayerViewModel
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,17 +46,17 @@ fun HomeScreen(
     val currentSong by playerVM.currentSong.collectAsState()
     val isPlaying by playerVM.isPlaying.collectAsState()
 
-    // Load Firestore
     LaunchedEffect(Unit) {
-        try {
-            val db = FirebaseFirestore.getInstance()
-            val snapshot = db.collection("songs").get().await()
-            songs = snapshot.documents.mapNotNull { doc ->
-                doc.toObject(Song::class.java)
-            }
-        } finally {
-            isLoading = false
-        }
+        songs = listOf(
+            Song("Bốn chữ lắm", "Trúc Nhân", null, R.raw.bon_chu_lam),
+            Song("Đừng trách câu vì đậm", "Cáp Anh tài", null, R.raw.dung_trach_cau_vi_dam),
+            Song("Em là cô giáo vùng cao", "Sến Hoàng Mỹ Lam", null, R.raw.em_la_co_giao_vung_cao),
+            Song("Ngắm hoa lệ rơi", "Châu Khải Phong", null, R.raw.ngam_hoa_le_roi),
+            Song("Original Me", "Astra Yao", null, R.raw.original_me),
+            Song("Vùng lá me bay", "Như Quỳnh", null, R.raw.vung_la_me_bay),
+            Song("Xin lỗi người anh yêu", "Châu Khải Phong", null, R.raw.xin_loi_nguoi_anh_yeu)
+        )
+        isLoading = false
     }
 
     ModalNavigationDrawer(
@@ -71,17 +66,13 @@ fun HomeScreen(
                 drawerContainerColor = Color(0xFF1a1a1a),
                 drawerContentColor = Color.White
             ) {
-                // Header Drawer
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(180.dp)
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0xFF1DB954),
-                                    Color(0xFF1a1a1a)
-                                )
+                                colors = listOf(Color(0xFF1DB954), Color(0xFF1a1a1a))
                             )
                         )
                         .padding(24.dp),
@@ -104,8 +95,7 @@ fun HomeScreen(
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            FirebaseAuth.getInstance().currentUser?.email?.split("@")?.first()
-                                ?: "User",
+                            FirebaseAuth.getInstance().currentUser?.email?.split("@")?.first() ?: "User",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -115,98 +105,24 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                NavigationDrawerItem(
-                    label = {
-                        Text(
-                            "Trang chủ",
-                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    selected = selectedTab == 0,
-                    onClick = {
-                        selectedTab = 0
-                        scope.launch { drawerState.close() }
-                    },
-                    colors = NavigationDrawerItemDefaults.colors(
-                        selectedContainerColor = Color(0xFF1DB954).copy(alpha = 0.2f),
-                        selectedTextColor = Color(0xFF1DB954),
-                        selectedIconColor = Color(0xFF1DB954),
-                        unselectedTextColor = Color.White.copy(alpha = 0.7f),
-                        unselectedIconColor = Color.White.copy(alpha = 0.7f)
-                    ),
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                )
-
-                NavigationDrawerItem(
-                    label = {
-                        Text(
-                            "Playlist",
-                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    icon = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
-                    selected = selectedTab == 1,
-                    onClick = {
-                        selectedTab = 1
-                        scope.launch { drawerState.close() }
-                    },
-                    colors = NavigationDrawerItemDefaults.colors(
-                        selectedContainerColor = Color(0xFF1DB954).copy(alpha = 0.2f),
-                        selectedTextColor = Color(0xFF1DB954),
-                        selectedIconColor = Color(0xFF1DB954),
-                        unselectedTextColor = Color.White.copy(alpha = 0.7f),
-                        unselectedIconColor = Color.White.copy(alpha = 0.7f)
-                    ),
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                )
-
-                NavigationDrawerItem(
-                    label = {
-                        Text(
-                            "Cài đặt",
-                            fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                    selected = selectedTab == 2,
-                    onClick = {
-                        selectedTab = 2
-                        scope.launch { drawerState.close() }
-                    },
-                    colors = NavigationDrawerItemDefaults.colors(
-                        selectedContainerColor = Color(0xFF1DB954).copy(alpha = 0.2f),
-                        selectedTextColor = Color(0xFF1DB954),
-                        selectedIconColor = Color(0xFF1DB954),
-                        unselectedTextColor = Color.White.copy(alpha = 0.7f),
-                        unselectedIconColor = Color.White.copy(alpha = 0.7f)
-                    ),
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                )
+                DrawerItem("Trang chủ", Icons.Default.Home, selectedTab == 0) {
+                    selectedTab = 0; scope.launch { drawerState.close() }
+                }
+                DrawerItem("Playlist", Icons.Default.QueueMusic, selectedTab == 1) {
+                    selectedTab = 1; scope.launch { drawerState.close() }
+                }
+                DrawerItem("Cài đặt", Icons.Default.Settings, selectedTab == 2) {
+                    selectedTab = 2; scope.launch { drawerState.close() }
+                }
 
                 Spacer(modifier = Modifier.weight(1f))
-
-                Divider(
-                    color = Color.White.copy(alpha = 0.1f),
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                )
-
-                NavigationDrawerItem(
-                    label = { Text("Đăng xuất") },
-                    icon = { Icon(Icons.Default.ExitToApp, contentDescription = null) },
-                    selected = false,
-                    onClick = {
-                        FirebaseAuth.getInstance().signOut()
-                        navController.navigate(Routes.AUTH) {
-                            popUpTo(Routes.HOME) { inclusive = true }
-                        }
-                    },
-                    colors = NavigationDrawerItemDefaults.colors(
-                        unselectedTextColor = Color(0xFFFF3B30),
-                        unselectedIconColor = Color(0xFFFF3B30)
-                    ),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
-                )
+                Divider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(12.dp))
+                DrawerItem("Đăng xuất", Icons.Default.ExitToApp, false, logout = true) {
+                    FirebaseAuth.getInstance().signOut()
+                    navController.navigate(Routes.AUTH) {
+                        popUpTo(Routes.HOME) { inclusive = true }
+                    }
+                }
             }
         }
     ) {
@@ -223,42 +139,27 @@ fun HomeScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(
-                                Icons.Default.Menu,
-                                contentDescription = "Menu",
-                                tint = Color.White
-                            )
+                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
                         }
                     },
                     actions = {
                         IconButton(onClick = { navController.navigate(Routes.SEARCH) }) {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = Color.White
-                            )
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White)
                         }
                     },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = Color(0xFF0D0D0D)
-                    )
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color(0xFF0D0D0D))
                 )
             },
             containerColor = Color(0xFF0D0D0D)
         ) { padding ->
             Box(modifier = Modifier.padding(padding)) {
-                when (selectedTab) {
-                    0 -> HomeScreenUI(
-                        songs = songs,
-                        isLoading = isLoading,
-                        navController = navController,
-                        playerVM = playerVM
-                    )
-                    1 -> PlaylistContent()
-                    2 -> SettingsContent(navController)
-                }
+                HomeScreenUI(
+                    songs = songs,
+                    isLoading = isLoading,
+                    navController = navController,
+                    playerVM = playerVM
+                )
 
-                // MiniPlayer
                 if (currentSong != null) {
                     MiniPlayer(
                         song = currentSong,
@@ -276,245 +177,245 @@ fun HomeScreen(
 }
 
 @Composable
+fun DrawerItem(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    logout: Boolean = false,
+    onClick: () -> Unit
+) {
+    NavigationDrawerItem(
+        label = { Text(title, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) },
+        icon = { Icon(icon, contentDescription = null) },
+        selected = selected,
+        onClick = onClick,
+        colors = NavigationDrawerItemDefaults.colors(
+            selectedContainerColor = if (!logout) Color(0xFF1DB954).copy(alpha = 0.2f) else Color.Transparent,
+            selectedTextColor = if (!logout) Color(0xFF1DB954) else Color(0xFFFF3B30),
+            selectedIconColor = if (!logout) Color(0xFF1DB954) else Color(0xFFFF3B30),
+            unselectedTextColor = if (!logout) Color.White.copy(alpha = 0.7f) else Color(0xFFFF3B30),
+            unselectedIconColor = if (!logout) Color.White.copy(alpha = 0.7f) else Color(0xFFFF3B30)
+        ),
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+    )
+}
+
+@Composable
 fun HomeScreenUI(
     songs: List<Song>,
     isLoading: Boolean,
     navController: NavController,
     playerVM: PlayerViewModel
 ) {
-    var currentBannerIndex by remember { mutableStateOf(0) }
-
-    LaunchedEffect(songs) {
-        if (songs.isNotEmpty()) {
-            while (true) {
-                kotlinx.coroutines.delay(5000)
-                currentBannerIndex = (currentBannerIndex + 1) % songs.size
-            }
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 90.dp)
-        ) {
-            // Banner
-            item {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = 80.dp),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        // Banner "Khám phá âm nhạc"
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .clickable { },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF404040)
+                )
+            ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                        .padding(16.dp)
-                ) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .shadow(16.dp, RoundedCornerShape(20.dp)),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Box {
-                            if (songs.isNotEmpty()) {
-                                AsyncImage(
-                                    model = songs[currentBannerIndex % songs.size].coverUrl
-                                        ?: android.R.drawable.ic_media_play,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color(0xFF606060),
+                                    Color(0xFF404040)
                                 )
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.Transparent,
-                                                Color.Black.copy(alpha = 0.8f)
-                                            )
-                                        )
-                                    )
                             )
-
-                            Column(
-                                modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(20.dp)
+                        )
+                        .padding(20.dp)
+                ) {
+                    Column(modifier = Modifier.align(Alignment.BottomStart)) {
+                        Surface(
+                            color = Color(0xFF1DB954),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Surface(
-                                    color = Color(0xFF1DB954),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        "🔥 TRENDING",
-                                        modifier = Modifier.padding(
-                                            horizontal = 12.dp,
-                                            vertical = 6.dp
-                                        ),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.Black
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    "Khám phá âm nhạc",
-                                    color = Color.White,
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.ExtraBold
+                                Icon(
+                                    Icons.Default.TrendingUp,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
                                 )
+                                Spacer(Modifier.width(6.dp))
                                 Text(
-                                    "Những bản hit mới nhất",
-                                    color = Color.White.copy(alpha = 0.8f),
-                                    fontSize = 14.sp
+                                    "TRENDING",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
+                        Text(
+                            "Khám phá âm nhạc",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            "Những bản hit mới nhất",
+                            fontSize = 14.sp,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
                     }
                 }
             }
+        }
 
-            item { Spacer(modifier = Modifier.height(8.dp)) }
-
-            // Playlist nổi bật
-            item {
+        // Playlist nổi bật
+        item {
+            Column {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         "Playlist nổi bật",
-                        color = Color.White,
                         fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
-                    TextButton(onClick = { navController.navigate(Routes.PLAYLIST_ALL) }) {
-                        Text(
-                            "Xem tất cả",
-                            color = Color(0xFF1DB954),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    Text(
+                        "Xem tất cả",
+                        fontSize = 14.sp,
+                        color = Color(0xFF1DB954),
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.clickable { }
+                    )
                 }
-            }
-
-            item {
-                if (isLoading) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = Color(0xFF1DB954),
-                            modifier = Modifier.size(40.dp)
-                        )
-                    }
-                } else {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp)
-                    ) {
-                        items(songs.take(10)) { song ->
-                            PlaylistCard(song) {
-                                playerVM.setPlaylist(songs, songs.indexOf(song))
-                            }
+                Spacer(Modifier.height(16.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(songs.take(4)) { song ->
+                        PlaylistCard(song) {
+                            playerVM.setPlaylist(songs, songs.indexOf(song))
+                            navController.navigate(Routes.PLAYER)
                         }
                     }
                 }
             }
+        }
 
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                ) {
-                    Text(
-                        "Gợi ý cho bạn",
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
+        // Gợi ý cho bạn
+        item {
+            Text(
+                "Gợi ý cho bạn",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
 
-            items(songs) { song ->
-                SongListItem(song) {
-                    playerVM.setPlaylist(songs, songs.indexOf(song))
-                }
+        if (!isLoading && songs.isNotEmpty()) {
+            items(songs.size) { index ->
+                val song = songs[index]
+                SongItem(
+                    song = song,
+                    onSongClick = {
+                        playerVM.setPlaylist(songs, index)
+                        navController.navigate(Routes.PLAYER)
+                    },
+                    onPlayClick = {
+                        playerVM.setPlaylist(songs, index)
+                    }
+                )
             }
         }
-    }
-}
 
-@Composable
-fun PlaylistCard(song: Song, onSongClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .width(160.dp)
-            .shadow(8.dp, RoundedCornerShape(16.dp))
-            .clickable { onSongClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF1a1a1a)
-        )
-    ) {
-        Column {
-            Box {
-                AsyncImage(
-                    model = song.coverUrl ?: android.R.drawable.ic_media_play,
-                    contentDescription = song.title,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp),
-                    contentScale = ContentScale.Crop
-                )
-
+        if (isLoading) {
+            item {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.3f)),
+                        .fillMaxWidth()
+                        .height(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Surface(
-                        modifier = Modifier.size(50.dp),
-                        shape = CircleShape,
-                        color = Color(0xFF1DB954).copy(alpha = 0.9f)
-                    ) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = "Play",
-                            tint = Color.White,
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
+                    CircularProgressIndicator(color = Color(0xFF1DB954))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PlaylistCard(song: Song, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .width(180.dp)
+            .height(240.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF282828))
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .background(Color(0xFF404040)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(70.dp),
+                        tint = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        song.title,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        song.artist,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    song.title,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    song.artist,
-                    color = Color.White.copy(alpha = 0.6f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontSize = 12.sp
+            FloatingActionButton(
+                onClick = { onClick() },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp)
+                    .size(50.dp),
+                containerColor = Color(0xFF1DB954),
+                elevation = FloatingActionButtonDefaults.elevation(6.dp)
+            ) {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = "Play",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
                 )
             }
         }
@@ -522,34 +423,40 @@ fun PlaylistCard(song: Song, onSongClick: () -> Unit) {
 }
 
 @Composable
-fun SongListItem(song: Song, onSongClick: () -> Unit) {
+fun SongItem(
+    song: Song,
+    onSongClick: () -> Unit,
+    onPlayClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
             .clickable { onSongClick() },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF1a1a1a)
-        )
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF282828))
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Card(
-                modifier = Modifier.size(60.dp),
-                shape = RoundedCornerShape(10.dp)
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF404040)),
+                contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = song.coverUrl ?: android.R.drawable.ic_media_play,
-                    contentDescription = song.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                Icon(
+                    Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.size(30.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -560,7 +467,7 @@ fun SongListItem(song: Song, onSongClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(Modifier.height(4.dp))
                 Text(
                     song.artist,
                     color = Color.White.copy(alpha = 0.6f),
@@ -570,10 +477,7 @@ fun SongListItem(song: Song, onSongClick: () -> Unit) {
                 )
             }
 
-            IconButton(
-                onClick = { /* TODO: favorite */ },
-                modifier = Modifier.size(40.dp)
-            ) {
+            IconButton(onClick = { /* Add to favorites */ }) {
                 Icon(
                     Icons.Default.FavoriteBorder,
                     contentDescription = "Favorite",
@@ -581,204 +485,19 @@ fun SongListItem(song: Song, onSongClick: () -> Unit) {
                 )
             }
 
-            IconButton(
-                onClick = { onSongClick() },
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(Color(0xFF1DB954), CircleShape)
+            FloatingActionButton(
+                onClick = { onPlayClick() },
+                modifier = Modifier.size(48.dp),
+                containerColor = Color(0xFF1DB954),
+                elevation = FloatingActionButtonDefaults.elevation(4.dp)
             ) {
                 Icon(
                     Icons.Default.PlayArrow,
                     contentDescription = "Play",
-                    tint = Color.White
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
-    }
-}
-
-@Composable
-fun PlaylistContent() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF0D0D0D)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                Icons.Default.QueueMusic,
-                contentDescription = null,
-                modifier = Modifier.size(80.dp),
-                tint = Color.White.copy(alpha = 0.3f)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                "Playlist của bạn",
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                "Chưa có playlist nào 🎶",
-                color = Color.White.copy(alpha = 0.6f),
-                fontSize = 14.sp
-            )
-        }
-    }
-}
-
-@Composable
-fun SettingsContent(navController: NavController) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF0D0D0D))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Text(
-                "Cài đặt",
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.padding(vertical = 16.dp)
-            )
-        }
-
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF1a1a1a)
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    SettingItem(
-                        icon = Icons.Default.Person,
-                        title = "Tài khoản",
-                        subtitle = FirebaseAuth.getInstance().currentUser?.email
-                            ?: "Không xác định",
-                        onClick = { }
-                    )
-                    Divider(
-                        color = Color.White.copy(alpha = 0.1f),
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                    SettingItem(
-                        icon = Icons.Default.Notifications,
-                        title = "Thông báo",
-                        subtitle = "Quản lý thông báo",
-                        onClick = { }
-                    )
-                }
-            }
-        }
-
-        item { Spacer(modifier = Modifier.height(16.dp)) }
-
-        item {
-            Button(
-                onClick = {
-                    FirebaseAuth.getInstance().signOut()
-                    navController.navigate(Routes.AUTH) {
-                        popUpTo(Routes.HOME) { inclusive = true }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .shadow(8.dp, RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent
-                ),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.horizontalGradient(
-                                colors = listOf(
-                                    Color(0xFFFF3B30),
-                                    Color(0xFFFF6B6B)
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.ExitToApp,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Đăng xuất",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SettingItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Surface(
-            modifier = Modifier.size(45.dp),
-            shape = CircleShape,
-            color = Color(0xFF1DB954).copy(alpha = 0.2f)
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = Color(0xFF1DB954),
-                modifier = Modifier.padding(10.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                title,
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp
-            )
-            Text(
-                subtitle,
-                color = Color.White.copy(alpha = 0.6f),
-                fontSize = 13.sp
-            )
-        }
-
-        Icon(
-            Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.4f)
-        )
     }
 }

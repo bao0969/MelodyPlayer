@@ -15,7 +15,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
@@ -128,48 +127,80 @@ fun MusicPlayerScreen(
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
-
+            // Phần giữa màn hình - Đĩa nhạc và tiêu đề
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp),
+                    .weight(1f)
+                    .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = currentSong?.coverUrl ?: "",
-                    contentDescription = "Album Art",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(260.dp)
-                        .clip(CircleShape)
-                        .rotate(if (isPlaying) rotation else 0f)
-                        .shadow(10.dp, CircleShape)
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    // Đĩa nhạc tròn
+                    Box(
+                        modifier = Modifier
+                            .size(280.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF2A2A2A))
+                            .rotate(if (isPlaying) rotation else 0f)
+                            .shadow(16.dp, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Ảnh bìa album
+                        AsyncImage(
+                            model = currentSong?.coverUrl ?: "",
+                            contentDescription = "Album Art",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(240.dp)
+                                .clip(CircleShape)
+                        )
+
+                        // Tâm đĩa
+                        Box(
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF1A1A1A))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF404040))
+                                    .align(Alignment.Center)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(32.dp))
+
+                    // Tiêu đề bài hát
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    ) {
+                        Text(
+                            text = currentSong?.title ?: "No song playing",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = currentSong?.artist ?: "Unknown Artist",
+                            fontSize = 16.sp,
+                            color = Color.White.copy(alpha = 0.6f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
-
-            Spacer(Modifier.height(32.dp))
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = currentSong?.title ?: "No song playing",
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = currentSong?.artist ?: "Unknown Artist",
-                    fontSize = 16.sp,
-                    color = Color.White.copy(alpha = 0.6f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(Modifier.height(32.dp))
 
             // Progress bar
             Column(
