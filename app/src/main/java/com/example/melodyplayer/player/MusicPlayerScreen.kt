@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,8 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.melodyplayer.model.Song
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
+import androidx.media3.common.Player
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,25 +40,31 @@ fun MusicPlayerScreen(
     val currentSong by playerVM.currentSong.collectAsState()
     val isPlaying by playerVM.isPlaying.collectAsState()
     val playlist by playerVM.playlist.collectAsState()
+    val playbackPosition by playerVM.playbackPosition.collectAsState()
+    val playbackDuration by playerVM.duration.collectAsState()
+    val shuffleEnabled by playerVM.shuffleEnabled.collectAsState()
+    val repeatMode by playerVM.repeatMode.collectAsState()
+    val playbackError by playerVM.playbackError.collectAsState()
 
     var showPlaylist by remember { mutableStateOf(false) }
-    var isShuffle by remember { mutableStateOf(false) }
-    var isRepeat by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf(0f) }
+    var sliderValue by remember { mutableStateOf(0f) }
+    var isSeeking by remember { mutableStateOf(false) }
+    val duration = playbackDuration.coerceAtLeast(0L)
+    val currentProgress = if (duration > 0) {
+        (playbackPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+    } else 0f
+    val displayedProgress = if (isSeeking) sliderValue else currentProgress
+    val elapsedPosition = if (isSeeking) (sliderValue * duration).toLong() else playbackPosition
 
-    // Simulated progress
-    LaunchedEffect(isPlaying) {
-        while (isActive && isPlaying) {
-            delay(100)
-            progress = (progress + 0.001f).coerceAtMost(1f)
-            if (progress >= 1f) {
-                progress = 0f
-                playerVM.nextSong()
-            }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(playbackError) {
+        playbackError?.let {
+            snackbarHostState.showSnackbar(it)
+            playerVM.clearError()
         }
     }
 
-    // Rotation animation for album art
     val rotation by rememberInfiniteTransition(label = "").animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -74,7 +80,13 @@ fun MusicPlayerScreen(
             .fillMaxSize()
             .background(Color(0xFF0D0D0D))
     ) {
-        // Background blur effect
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp)
+        )
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -99,125 +111,55 @@ fun MusicPlayerScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(
-                    onClick = { navController.popBackStack() },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(Color.White.copy(alpha = 0.1f), CircleShape)
-                ) {
-                    Icon(
-                        Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Back",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(Icons.Default.ArrowBack, null, tint = Color.White)
                 }
-
                 Text(
-                    "Now Playing",
+                    "Đang phát",
                     color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
                 )
-
-                IconButton(
-                    onClick = { /* More options */ },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(Color.White.copy(alpha = 0.1f), CircleShape)
-                ) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = "More",
-                        tint = Color.White
-                    )
+                IconButton(onClick = { showPlaylist = !showPlaylist }) {
+                    Icon(Icons.Default.QueueMusic, null, tint = Color.White)
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(Modifier.height(20.dp))
 
-            // Album Art
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .padding(horizontal = 40.dp),
+                    .height(300.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // Shadow circle
-                Box(
+                AsyncImage(
+                    model = currentSong?.coverUrl ?: "",
+                    contentDescription = "Album Art",
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .fillMaxSize(0.85f)
-                        .shadow(24.dp, CircleShape)
-                        .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                        .size(260.dp)
+                        .clip(CircleShape)
+                        .rotate(if (isPlaying) rotation else 0f)
+                        .shadow(10.dp, CircleShape)
                 )
-
-                // Album art
-                Card(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .rotate(if (isPlaying) rotation else 0f),
-                    shape = CircleShape,
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                ) {
-                    Box {
-                        AsyncImage(
-                            model = currentSong?.coverUrl ?: android.R.drawable.ic_media_play,
-                            contentDescription = currentSong?.title,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-
-                        // Center circle
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Surface(
-                                modifier = Modifier.size(80.dp),
-                                shape = CircleShape,
-                                color = Color.Black.copy(alpha = 0.6f)
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    Icon(
-                                        Icons.Default.MusicNote,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(40.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(Modifier.height(32.dp))
 
-            // Song Info
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = currentSong?.title ?: "Unknown",
+                    text = currentSong?.title ?: "No song playing",
                     fontSize = 26.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     text = currentSong?.artist ?: "Unknown Artist",
                     fontSize = 16.sp,
@@ -227,17 +169,25 @@ fun MusicPlayerScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(Modifier.height(32.dp))
 
-            // Progress Bar
+            // Progress bar
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp)
             ) {
                 Slider(
-                    value = progress,
-                    onValueChange = { progress = it },
+                    value = displayedProgress,
+                    onValueChange = {
+                        isSeeking = true
+                        sliderValue = it
+                    },
+                    onValueChangeFinished = {
+                        if (duration > 0) playerVM.seekTo((sliderValue * duration).toLong())
+                        isSeeking = false
+                    },
+                    valueRange = 0f..1f,
                     modifier = Modifier.fillMaxWidth(),
                     colors = SliderDefaults.colors(
                         thumbColor = Color(0xFF1DB954),
@@ -250,22 +200,14 @@ fun MusicPlayerScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        formatTime((progress * 240000).toLong()),
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 12.sp
-                    )
-                    Text(
-                        formatTime(240000),
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 12.sp
-                    )
+                    Text(formatTime(elapsedPosition), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                    Text(formatTime(duration), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Control Buttons
+            // Control buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -273,81 +215,54 @@ fun MusicPlayerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = { isShuffle = !isShuffle },
-                    modifier = Modifier.size(48.dp)
-                ) {
+                IconButton(onClick = { playerVM.toggleShuffle() }, modifier = Modifier.size(48.dp)) {
                     Icon(
                         Icons.Default.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = if (isShuffle) Color(0xFF1DB954) else Color.White.copy(alpha = 0.6f),
+                        null,
+                        tint = if (shuffleEnabled) Color(0xFF1DB954) else Color.White.copy(alpha = 0.6f),
                         modifier = Modifier.size(28.dp)
                     )
                 }
 
-                IconButton(
-                    onClick = { playerVM.prevSong() },
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        Icons.Default.SkipPrevious,
-                        contentDescription = "Previous",
-                        tint = Color.White,
-                        modifier = Modifier.size(40.dp)
-                    )
+                IconButton(onClick = { playerVM.prevSong() }, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Default.SkipPrevious, null, tint = Color.White, modifier = Modifier.size(40.dp))
                 }
 
                 FloatingActionButton(
                     onClick = { playerVM.togglePlayPause() },
                     modifier = Modifier.size(80.dp),
                     containerColor = Color(0xFF1DB954),
-                    elevation = FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 8.dp,
-                        pressedElevation = 12.dp
-                    )
+                    elevation = FloatingActionButtonDefaults.elevation(8.dp, 12.dp)
                 ) {
                     Icon(
                         if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = "Play/Pause",
+                        null,
                         tint = Color.White,
                         modifier = Modifier.size(40.dp)
                     )
                 }
 
-                IconButton(
-                    onClick = { playerVM.nextSong() },
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        Icons.Default.SkipNext,
-                        contentDescription = "Next",
-                        tint = Color.White,
-                        modifier = Modifier.size(40.dp)
-                    )
+                IconButton(onClick = { playerVM.nextSong() }, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Default.SkipNext, null, tint = Color.White, modifier = Modifier.size(40.dp))
                 }
 
-                IconButton(
-                    onClick = { isRepeat = !isRepeat },
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Repeat,
-                        contentDescription = "Repeat",
-                        tint = if (isRepeat) Color(0xFF1DB954) else Color.White.copy(alpha = 0.6f),
-                        modifier = Modifier.size(28.dp)
-                    )
+                IconButton(onClick = { playerVM.cycleRepeatMode() }, modifier = Modifier.size(48.dp)) {
+                    val repeatIcon =
+                        if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
+                    val repeatTint =
+                        if (repeatMode != Player.REPEAT_MODE_OFF) Color(0xFF1DB954) else Color.White.copy(alpha = 0.6f)
+                    Icon(repeatIcon, null, tint = repeatTint, modifier = Modifier.size(28.dp))
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Additional Controls
+            // Bottom section
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 IconButton(
                     onClick = { /* Add to favorites */ },
@@ -355,102 +270,48 @@ fun MusicPlayerScreen(
                         .size(48.dp)
                         .background(Color.White.copy(alpha = 0.1f), CircleShape)
                 ) {
-                    Icon(
-                        Icons.Default.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = Color.White
-                    )
-                }
-
-                TextButton(
-                    onClick = { showPlaylist = !showPlaylist },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = Color.White
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.QueueMusic,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "Playlist (${playlist.size})",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                IconButton(
-                    onClick = { /* Share */ },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(Color.White.copy(alpha = 0.1f), CircleShape)
-                ) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = "Share",
-                        tint = Color.White
-                    )
+                    Icon(Icons.Default.FavoriteBorder, null, tint = Color.White)
                 }
             }
         }
 
-        // Playlist Bottom Sheet
         if (showPlaylist) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .clickable { showPlaylist = false }
-            )
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.6f)
-                    .align(Alignment.BottomCenter),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF1a1a1a)
-                )
+                    .background(Color(0xAA000000))
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp)
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(Color(0xFF1E1E1E), RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                        .padding(16.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
                             "Đang phát (${playlist.size})",
                             color = Color.White,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
                         )
                         IconButton(onClick = { showPlaylist = false }) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = Color.White
-                            )
+                            Icon(Icons.Default.Close, null, tint = Color.White)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(Modifier.height(16.dp))
 
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         itemsIndexed(playlist) { index, song ->
                             PlaylistItemCard(
                                 song = song,
                                 isPlaying = song == currentSong,
                                 onClick = {
-                                    playerVM.setPlaylist(playlist, index)
+                                    playerVM.playSong(index)
                                     showPlaylist = false
                                 }
                             )
@@ -463,74 +324,49 @@ fun MusicPlayerScreen(
 }
 
 @Composable
-fun PlaylistItemCard(
-    song: Song,
-    isPlaying: Boolean,
-    onClick: () -> Unit
-) {
+fun PlaylistItemCard(song: Song, isPlaying: Boolean, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isPlaying)
-                Color(0xFF1DB954).copy(alpha = 0.2f)
-            else
-                Color(0xFF2a2a2a)
+            containerColor = if (isPlaying) Color(0xFF1DB954).copy(alpha = 0.2f) else Color(0xFF2C2C2C)
         )
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Card(
-                modifier = Modifier.size(50.dp),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                AsyncImage(
-                    model = song.coverUrl ?: android.R.drawable.ic_media_play,
-                    contentDescription = song.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(
+                model = song.coverUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
+            )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    song.title,
-                    color = if (isPlaying) Color(0xFF1DB954) else Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Text(song.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
                 Text(
                     song.artist,
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
             if (isPlaying) {
-                Icon(
-                    Icons.Default.VolumeUp,
-                    contentDescription = "Playing",
-                    tint = Color(0xFF1DB954),
-                    modifier = Modifier.size(24.dp)
-                )
+                Icon(Icons.Default.Equalizer, null, tint = Color(0xFF1DB954))
             }
         }
     }
 }
 
-private fun formatTime(ms: Long): String {
-    val totalSec = (ms / 1000).toInt()
-    val m = totalSec / 60
-    val s = totalSec % 60
-    return "%d:%02d".format(m, s)
+fun formatTime(ms: Long): String {
+    val totalSec = ms / 1000
+    val min = totalSec / 60
+    val sec = totalSec % 60
+    return "%02d:%02d".format(min, sec)
 }

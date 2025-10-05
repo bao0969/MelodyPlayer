@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">My Application</string>
+    <string name="app_name">Melody Player</string>
+    <string name="playback_channel_name">Phát nhạc</string>
+    <string name="playback_channel_description">Điều khiển phát nhạc nền cho Melody Player</string>
 </resources>
