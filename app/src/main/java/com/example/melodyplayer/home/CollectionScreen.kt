@@ -1,13 +1,11 @@
 package com.example.melodyplayer.ui.screens
 
-import androidx.compose.ui.platform.LocalContext
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,37 +17,46 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import com.example.melodyplayer.model.Song
+import com.example.melodyplayer.navigation.Routes
 import com.example.melodyplayer.player.PlayerViewModel
-import kotlinx.serialization.decodeFromString
+import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CollectionScreen(
+fun CollectionsScreen(
     navController: NavController,
-    playerVM: PlayerViewModel,
-    title: String,
-    songsJson: String
+    playerVM: PlayerViewModel
 ) {
-    val initialSongs = remember {
-        try {
-            Json.decodeFromString<List<Song>>(songsJson)
-        } catch (e: Exception) {
-            emptyList()
+    val collections by playerVM.collections.collectAsState()
+    val favoriteSongs by playerVM.favoriteSongs.collectAsState()
+    var showDeleteDialog by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // ✅ Đảm bảo có bộ sưu tập "Yêu thích" và đồng bộ bài hát yêu thích
+    LaunchedEffect(Unit) {
+        playerVM.ensureCollectionExists("Yêu thích")
+        favoriteSongs.forEach { fav ->
+            val parts = fav.split("||")
+            if (parts.size >= 2) {
+                val song = Song(
+                    title = parts[0],
+                    artist = parts[1],
+                    imageUrl = null,
+                    audioUrl = null,
+                    resId = null
+                )
+                playerVM.addSongToCollection(song, "Yêu thích")
+            }
         }
     }
-
-    val songs = remember { mutableStateListOf(*initialSongs.toTypedArray()) }
-    var showAddDialog by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = Color(0xFF121212)
@@ -59,14 +66,14 @@ fun CollectionScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Header with gradient
+            // 🎵 Header
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(400.dp)
+                        .height(280.dp)
                 ) {
-                    // Gradient background
+                    // Gradient nền xanh lá - đen
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -77,217 +84,69 @@ fun CollectionScreen(
                                         Color(0xFF121212)
                                     ),
                                     startY = 0f,
-                                    endY = 1000f
+                                    endY = 800f
                                 )
                             )
                     )
 
-                    // Top bar
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(
-                                Icons.Default.ArrowBack,
-                                contentDescription = "Quay lại",
-                                tint = Color.White,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-
-                        Box {
-                            IconButton(onClick = { showMenu = !showMenu }) {
+                        // Nút quay lại
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { navController.popBackStack() }) {
                                 Icon(
-                                    Icons.Default.MoreVert,
-                                    contentDescription = "Menu",
+                                    Icons.Default.ArrowBack,
+                                    contentDescription = "Quay lại",
                                     tint = Color.White,
                                     modifier = Modifier.size(28.dp)
                                 )
                             }
-                            DropdownMenu(
-                                expanded = showMenu,
-                                onDismissRequest = { showMenu = false },
-                                modifier = Modifier
-                                    .background(Color(0xFF282828))
-                                    .width(200.dp)
-                            ) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(vertical = 4.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Add,
-                                                contentDescription = null,
-                                                tint = Color.White,
-                                                modifier = Modifier.size(22.dp)
-                                            )
-                                            Spacer(Modifier.width(16.dp))
-                                            Text("Thêm bài hát", color = Color.White, fontSize = 15.sp)
-                                        }
-                                    },
-                                    onClick = {
-                                        showAddDialog = true
-                                        showMenu = false
-                                    }
-                                )
-                                if (songs.isNotEmpty()) {
-                                    Divider(color = Color.Gray.copy(0.2f), modifier = Modifier.padding(vertical = 4.dp))
-                                    DropdownMenuItem(
-                                        text = {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                modifier = Modifier.padding(vertical = 4.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Outlined.Delete,
-                                                    contentDescription = null,
-                                                    tint = Color(0xFFFF5252),
-                                                    modifier = Modifier.size(22.dp)
-                                                )
-                                                Spacer(Modifier.width(16.dp))
-                                                Text("Xóa tất cả", color = Color(0xFFFF5252), fontSize = 15.sp)
-                                            }
-                                        },
-                                        onClick = {
-                                            songs.clear()
-                                            showMenu = false
-                                        }
-                                    )
-                                }
-                            }
                         }
-                    }
 
-                    // Cover and title
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 80.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Cover art
-                        Box(
+                        // Tiêu đề
+                        Column(
                             modifier = Modifier
-                                .size(220.dp)
-                                .background(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            Color(0xFF1ED760),
-                                            Color(0xFF1DB954),
-                                            Color(0xFF169C46)
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Icon(
-                                Icons.Outlined.MusicNote,
+                                Icons.Outlined.LibraryMusic,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(100.dp)
+                                modifier = Modifier.size(80.dp)
                             )
-                        }
-
-                        Spacer(Modifier.height(24.dp))
-
-                        // Title
-                        Text(
-                            title,
-                            color = Color.White,
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Spacer(Modifier.height(8.dp))
-
-                        // Count
-                        Text(
-                            "${songs.size} bài hát",
-                            color = Color.White.copy(0.7f),
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-            }
-
-            // Action buttons
-            if (songs.isNotEmpty()) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFF121212))
-                            .padding(horizontal = 16.dp, vertical = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Shuffle play button
-                        Button(
-                            onClick = {
-                                playerVM.setPlaylist(songs.shuffled(), 0)
-                                navController.navigate("player")
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF1DB954)
-                            ),
-                            shape = RoundedCornerShape(26.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Shuffle,
-                                contentDescription = null,
-                                tint = Color.Black,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.height(16.dp))
                             Text(
-                                "Phát ngẫu nhiên",
-                                color = Color.Black,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
+                                "Bộ sưu tập của tôi",
+                                color = Color.White,
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.ExtraBold
                             )
-                        }
-
-                        Spacer(Modifier.width(12.dp))
-
-                        // Play button
-                        FloatingActionButton(
-                            onClick = {
-                                playerVM.setPlaylist(songs, 0)
-                                navController.navigate("player")
-                            },
-                            containerColor = Color.White,
-                            modifier = Modifier.size(52.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = "Phát",
-                                tint = Color.Black,
-                                modifier = Modifier.size(30.dp)
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "${collections.size} bộ sưu tập",
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 14.sp
                             )
                         }
                     }
                 }
             }
 
-            // Songs list or empty state
-            if (songs.isEmpty()) {
+            // 🎧 Nếu chưa có bộ sưu tập
+            if (collections.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(300.dp)
-                            .background(Color(0xFF121212))
+                            .height(400.dp)
                             .padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -296,322 +155,254 @@ fun CollectionScreen(
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Icon(
-                                Icons.Outlined.MusicNote,
+                                Icons.Outlined.LibraryMusic,
                                 contentDescription = null,
                                 tint = Color.Gray.copy(0.4f),
-                                modifier = Modifier.size(64.dp)
+                                modifier = Modifier.size(80.dp)
                             )
                             Text(
-                                "Chưa có bài hát nào",
+                                "Chưa có bộ sưu tập nào",
                                 color = Color.White,
-                                fontSize = 18.sp,
+                                fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                "Nhấn menu ⋮ để thêm",
+                                "Thêm bài hát yêu thích vào bộ sưu tập\nđể dễ dàng tìm kiếm và phát nhạc",
                                 color = Color.Gray,
-                                fontSize = 14.sp
+                                fontSize = 14.sp,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
                 }
             } else {
-                items(songs) { song ->
-                    SpotifySongItem(
-                        song = song,
-                        onPlay = {
-                            playerVM.setPlaylist(songs, songs.indexOf(song))
-                            navController.navigate("player")
+                // 📀 Danh sách collection
+                items(collections) { collectionName ->
+                    val songCount = playerVM.getSongsInCollection(collectionName).size
+                    CollectionCard(
+                        collectionName = collectionName,
+                        songCount = songCount,
+                        onClick = {
+                            val songs: List<Song>
+
+                            // ✅ Nếu là bộ "Yêu thích" thì lấy từ favoriteSongs
+                            if (collectionName == "Yêu thích") {
+                                songs = playerVM.favoriteSongs.value.mapNotNull { fav ->
+                                    val parts = fav.split("||")
+                                    if (parts.size >= 2) {
+                                        Song(
+                                            title = parts[0],
+                                            artist = parts[1],
+                                            imageUrl = null,
+                                            audioUrl = null,
+                                            resId = null
+                                        )
+                                    } else null
+                                }
+                            } else {
+                                // ✅ Ngược lại thì lấy từ danh sách bộ sưu tập
+                                songs = playerVM.getSongsInCollection(collectionName)
+                            }
+
+                            if (songs.isEmpty()) {
+                                println("⚠️ Bộ '$collectionName' trống.")
+                                return@CollectionCard
+                            }
+
+                            val songsJson = Json.encodeToString(songs)
+                            val encodedTitle = Uri.encode(collectionName)
+                            val encodedJson = Uri.encode(songsJson)
+
+                            // ✅ Điều hướng đúng route chi tiết
+                            navController.navigate("collection/$encodedTitle/$encodedJson") {
+                                launchSingleTop = true
+                            }
                         },
                         onDelete = {
-                            songs.remove(song)
+                            showDeleteDialog = collectionName
                         }
                     )
+
+
                 }
+
                 item {
-                    Spacer(Modifier.height(80.dp))
+                    Spacer(Modifier.height(100.dp))
                 }
             }
         }
     }
 
-    if (showAddDialog) {
-        ModernAddDialog(
-            allSongs = playerVM.playlist.collectAsState().value,
-            currentSongs = songs,
-            onDismiss = { showAddDialog = false },
-            onAdd = { selectedSong ->
-                if (!songs.contains(selectedSong)) songs.add(selectedSong)
-                showAddDialog = false
+    // ❌ Dialog xác nhận xóa
+    showDeleteDialog?.let { collectionName ->
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = null },
+            containerColor = Color(0xFF282828),
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    "Xóa bộ sưu tập?",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            },
+            text = {
+                Text(
+                    "Bạn có chắc muốn xóa \"$collectionName\"?\nHành động này không thể hoàn tác.",
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch { playerVM.deleteCollection(collectionName) }
+                        showDeleteDialog = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFF5252)
+                    ),
+                    shape = RoundedCornerShape(24.dp)
+                ) {
+                    Text("Xóa", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteDialog = null },
+                    shape = RoundedCornerShape(24.dp)
+                ) {
+                    Text("Hủy", color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
         )
     }
 }
 
 @Composable
-fun SpotifySongItem(
-    song: Song,
-    onPlay: () -> Unit,
+fun CollectionCard(
+    collectionName: String,
+    songCount: Int,
+    onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
-    Row(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF121212))
-            .clickable(onClick = onPlay)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+        shape = RoundedCornerShape(12.dp)
     ) {
-        // Album art
-        Box(
+        Row(
             modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(Color(0xFF282828)),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (!song.imageUrl.isNullOrEmpty()) {
-                AsyncImage(
-                    model = song.imageUrl,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            // Fallback icon (always show, but image will be on top if loaded)
-            if (song.imageUrl.isNullOrEmpty()) {
-                Icon(
-                    Icons.Outlined.MusicNote,
-                    contentDescription = null,
-                    tint = Color.Gray,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
-
-        Spacer(Modifier.width(12.dp))
-
-        // Song info
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(
-                song.title,
-                color = Color.White,
-                fontSize = 16.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                song.artist,
-                color = Color.Gray,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        // Menu button
-        Box {
-            IconButton(
-                onClick = { showMenu = true },
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    Icons.Default.MoreVert,
-                    contentDescription = "Menu",
-                    tint = Color.Gray,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false },
+            Box(
                 modifier = Modifier
-                    .background(Color(0xFF282828))
-                    .width(220.dp)
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF1ED760),
+                                Color(0xFF1DB954),
+                                Color(0xFF169C46)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                DropdownMenuItem(
-                    text = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(Modifier.width(16.dp))
-                            Text("Phát bài hát", color = Color.White, fontSize = 15.sp)
-                        }
-                    },
-                    onClick = {
-                        showMenu = false
-                        onPlay()
-                    }
+                Icon(
+                    Icons.Outlined.LibraryMusic,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(30.dp)
                 )
+            }
 
-                Divider(color = Color.Gray.copy(0.2f))
+            Spacer(Modifier.width(16.dp))
 
-                DropdownMenuItem(
-                    text = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        ) {
-                            Icon(
-                                Icons.Outlined.Delete,
-                                contentDescription = null,
-                                tint = Color(0xFFFF5252),
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(Modifier.width(16.dp))
-                            Text("Xóa khỏi playlist", color = Color.White, fontSize = 15.sp)
-                        }
-                    },
-                    onClick = {
-                        showMenu = false
-                        onDelete()
-                    }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    collectionName,
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
                 )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "$songCount bài hát",
+                    color = Color.Gray,
+                    fontSize = 13.sp
+                )
+            }
+
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "Menu",
+                        tint = Color.Gray
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier = Modifier.background(Color(0xFF282828))
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color.White
+                                )
+                                Spacer(Modifier.width(16.dp))
+                                Text("Phát tất cả", color = Color.White)
+                            }
+                        },
+                        onClick = {
+                            showMenu = false
+                            onClick()
+                        }
+                    )
+
+                    Divider(color = Color.Gray.copy(0.2f))
+
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Delete,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFF5252)
+                                )
+                                Spacer(Modifier.width(16.dp))
+                                Text("Xóa bộ sưu tập", color = Color(0xFFFF5252))
+                            }
+                        },
+                        onClick = {
+                            showMenu = false
+                            onDelete()
+                        }
+                    )
+                }
             }
         }
     }
-}
-
-@Composable
-fun ModernAddDialog(
-    allSongs: List<Song>,
-    currentSongs: List<Song>,
-    onDismiss: () -> Unit,
-    onAdd: (Song) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color(0xFF282828),
-        shape = RoundedCornerShape(16.dp),
-        title = {
-            Text(
-                "Thêm bài hát",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp
-            )
-        },
-        text = {
-            if (allSongs.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Icon(
-                            Icons.Outlined.MusicNote,
-                            contentDescription = null,
-                            tint = Color.Gray,
-                            modifier = Modifier.size(56.dp)
-                        )
-                        Text(
-                            "Chưa có bài hát nào",
-                            color = Color.Gray,
-                            fontSize = 16.sp
-                        )
-                    }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.height(450.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    items(allSongs) { song ->
-                        val isAdded = currentSongs.contains(song)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = !isAdded) { onAdd(song) }
-                                .padding(vertical = 8.dp, horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(50.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(Color(0xFF404040)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (!song.imageUrl.isNullOrEmpty()) {
-                                    AsyncImage(
-                                        model = song.imageUrl,
-                                        contentDescription = null,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop,
-                                        alpha = if (isAdded) 0.5f else 1f
-                                    )
-                                }
-                                if (song.imageUrl.isNullOrEmpty()) {
-                                    Icon(
-                                        Icons.Outlined.MusicNote,
-                                        contentDescription = null,
-                                        tint = Color.Gray,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(Modifier.width(12.dp))
-
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    song.title,
-                                    color = if (isAdded) Color.Gray else Color.White,
-                                    fontSize = 15.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    song.artist,
-                                    color = Color.Gray,
-                                    fontSize = 13.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-
-                            if (isAdded) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = "Đã thêm",
-                                    tint = Color(0xFF1DB954),
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    "Đóng",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
-        }
-    )
 }

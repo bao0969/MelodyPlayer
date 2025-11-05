@@ -4,6 +4,7 @@ package com.example.melodyplayer.player
 
 import android.app.Application
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
@@ -41,11 +42,80 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val mediaIdToSong = mutableMapOf<String, Song>()
 
     // --- TÍCH HỢP TÍNH NĂNG YÊU THÍCH (Bắt đầu) ---
-    private val favoritesDataStore = FavoritesDataStore(context) // ❗️ Hãy chắc chắn bạn có file FavoritesDataStore.kt này
+    private val favoritesDataStore = FavoritesDataStore(context)
 
     private val _favoriteSongs = MutableStateFlow<Set<String>>(emptySet())
     val favoriteSongs: StateFlow<Set<String>> = _favoriteSongs.asStateFlow()
     // --- TÍCH HỢP TÍNH NĂNG YÊU THÍCH (Kết thúc) ---
+
+    // --- TÍCH HỢP COLLECTIONS (Bắt đầu) ---
+    private val collectionsPrefs = context.getSharedPreferences("collections", Context.MODE_PRIVATE)
+
+    private val _collections = MutableStateFlow<List<String>>(emptyList())
+    val collections: StateFlow<List<String>> = _collections.asStateFlow()
+
+    private fun reloadCollections() {
+        val allKeys = collectionsPrefs.all.keys
+        _collections.value = allKeys.filter { it.startsWith("collection_") }
+            .map { it.removePrefix("collection_") }
+            .sorted()
+    }
+
+    fun ensureCollectionExists(collectionName: String) {
+        val key = "collection_$collectionName"
+        if (!collectionsPrefs.contains(key)) {
+            collectionsPrefs.edit().putStringSet(key, mutableSetOf()).apply()
+            reloadCollections()
+        }
+    }
+
+    fun addSongToCollection(song: Song, collectionName: String) {
+        viewModelScope.launch {
+            ensureCollectionExists(collectionName)
+            val key = "collection_$collectionName"
+            val currentSongs = collectionsPrefs.getStringSet(key, mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+            val songKey = "${song.title}||${song.artist}||${song.imageUrl}||${song.audioUrl}||${song.resId}"
+            currentSongs.add(songKey)
+            collectionsPrefs.edit().putStringSet(key, currentSongs).apply()
+            reloadCollections()
+        }
+    }
+
+    fun getSongsInCollection(collectionName: String): List<Song> {
+        val key = "collection_$collectionName"
+        val songsSet = collectionsPrefs.getStringSet(key, emptySet()) ?: emptySet()
+        return songsSet.mapNotNull { songString ->
+            val parts = songString.split("||")
+            if (parts.size >= 3) {
+                Song(
+                    title = parts[0],
+                    artist = parts[1],
+                    imageUrl = parts.getOrNull(2),
+                    audioUrl = parts.getOrNull(3),
+                    resId = parts.getOrNull(4)
+                )
+            } else null
+        }
+    }
+
+    fun removeSongFromCollection(song: Song, collectionName: String) {
+        viewModelScope.launch {
+            val key = "collection_$collectionName"
+            val currentSongs = collectionsPrefs.getStringSet(key, mutableSetOf())?.toMutableSet() ?: return@launch
+            currentSongs.removeIf { it.startsWith("${song.title}||${song.artist}") }
+            collectionsPrefs.edit().putStringSet(key, currentSongs).apply()
+            reloadCollections()
+        }
+    }
+
+    fun deleteCollection(collectionName: String) {
+        viewModelScope.launch {
+            val key = "collection_$collectionName"
+            collectionsPrefs.edit().remove(key).apply()
+            reloadCollections()
+        }
+    }
+    // --- TÍCH HỢP COLLECTIONS (Kết thúc) ---
 
     private val _playlist = MutableStateFlow<List<Song>>(emptyList())
     val playlist: StateFlow<List<Song>> = _playlist.asStateFlow()
@@ -102,7 +172,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _favoriteSongs.value = favoritesDataStore.favoriteSongs.first()
         }
-        // --- TÍCH HỢP TÍNH NĂNG YÊU THÍCH ---
+
+        // --- TÍCH HỢP COLLECTIONS ---
+        // Tải danh sách collections
+        reloadCollections()
     }
 
     // --- TÍCH HỢP TÍNH NĂNG YÊU THÍCH ---
@@ -122,7 +195,6 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             _favoriteSongs.value = favoritesDataStore.favoriteSongs.first()
         }
     }
-    // --- TÍCH HỢP TÍNH NĂNG YÊU THÍCH ---
 
     fun setPlaylist(songs: List<Song>, startIndex: Int = 0) {
         if (songs.isEmpty()) {
@@ -275,9 +347,8 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 _currentSong.value = song
             }
 
-            // ✅ THAY ĐỔI 1: Gọi đến hàm đã đổi tên
             override fun onPlayerError(error: PlaybackException) {
-                handlePlaybackError(error) // Sửa lỗi gọi đệ quy (recursion)
+                handlePlaybackError(error)
             }
 
             override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
@@ -302,7 +373,6 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // ✅ THAY ĐỔI 2: Đổi tên hàm private này
     private fun handlePlaybackError(error: PlaybackException) {
         Log.e(TAG, "Lỗi phát nhạc: ${error.message}", error)
         _playbackError.value = error.localizedMessage ?: "Đã xảy ra lỗi khi phát nhạc"
@@ -366,7 +436,6 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             mediaItem
         }
     }
-
 
     override fun onCleared() {
         super.onCleared()

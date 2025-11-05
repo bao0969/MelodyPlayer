@@ -6,11 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +31,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.melodyplayer.model.Song
 import androidx.media3.common.Player
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,13 +47,13 @@ fun MusicPlayerScreen(
     val shuffleEnabled by playerVM.shuffleEnabled.collectAsState()
     val repeatMode by playerVM.repeatMode.collectAsState()
     val playbackError by playerVM.playbackError.collectAsState()
-
-    // THÊM MỚI: Lắng nghe trạng thái danh sách yêu thích từ ViewModel
     val favoriteSongs by playerVM.favoriteSongs.collectAsState()
 
     var showPlaylist by remember { mutableStateOf(false) }
+    var showCollectionDialog by remember { mutableStateOf(false) }
     var sliderValue by remember { mutableStateOf(0f) }
     var isSeeking by remember { mutableStateOf(false) }
+
     val duration = playbackDuration.coerceAtLeast(0L)
     val currentProgress = if (duration > 0) {
         (playbackPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
@@ -291,19 +294,24 @@ fun MusicPlayerScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // Bottom section
+            // Bottom section - Nút yêu thích
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // TÌM VÀ THAY THẾ TOÀN BỘ IconButton YÊU THÍCH CŨ BẰNG ĐOẠN NÀY
                 val isFavorite = currentSong?.let { "${it.title}||${it.artist}" in favoriteSongs } == true
 
                 IconButton(
                     onClick = {
-                        currentSong?.let { playerVM.toggleFavorite(it) }
+                        currentSong?.let { song ->
+                            playerVM.toggleFavorite(song)
+                            // Nếu đang thêm vào yêu thích (chưa có trong danh sách)
+                            if (!isFavorite) {
+                                showCollectionDialog = true
+                            }
+                        }
                     },
                     modifier = Modifier
                         .size(48.dp)
@@ -318,25 +326,30 @@ fun MusicPlayerScreen(
             }
         }
 
+        // Playlist overlay
         if (showPlaylist) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xAA000000))
+                    .clickable { showPlaylist = false }
             ) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        .fillMaxHeight(0.7f)
                         .background(
                             Color(0xFF1E1E1E),
                             RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                         )
+                        .clickable(enabled = false) {} // Ngăn click through
                         .padding(16.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             "Đang phát (${playlist.size})",
@@ -351,7 +364,9 @@ fun MusicPlayerScreen(
 
                     Spacer(Modifier.height(16.dp))
 
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         itemsIndexed(playlist) { index, song ->
                             PlaylistItemCard(
                                 song = song,
@@ -365,6 +380,20 @@ fun MusicPlayerScreen(
                     }
                 }
             }
+        }
+
+        // Collection dialog
+        if (showCollectionDialog) {
+            AddToCollectionDialog(
+                currentSong = currentSong,
+                snackbarHostState = snackbarHostState,
+                onDismiss = { showCollectionDialog = false },
+                onAddToCollection = { song, collectionName ->
+                    // TODO: Thêm function vào ViewModel để lưu vào collection
+                    // playerVM.addSongToCollection(song, collectionName)
+                    showCollectionDialog = false
+                }
+            )
         }
     }
 }
@@ -380,7 +409,10 @@ fun PlaylistItemCard(song: Song, isPlaying: Boolean, onClick: () -> Unit) {
             containerColor = if (isPlaying) Color(0xFF1DB954).copy(alpha = 0.2f) else Color(0xFF2C2C2C)
         )
     ) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             AsyncImage(
                 model = song.imageUrl,
                 contentDescription = null,
@@ -393,7 +425,13 @@ fun PlaylistItemCard(song: Song, isPlaying: Boolean, onClick: () -> Unit) {
             Spacer(Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(song.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(
+                    song.title,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Text(
                     song.artist,
                     color = Color.White.copy(alpha = 0.7f),
@@ -408,6 +446,276 @@ fun PlaylistItemCard(song: Song, isPlaying: Boolean, onClick: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+fun AddToCollectionDialog(
+    currentSong: Song?,
+    snackbarHostState: SnackbarHostState,
+    onDismiss: () -> Unit,
+    onAddToCollection: (Song, String) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    // Danh sách collection mẫu - trong thực tế lấy từ ViewModel
+    val collections = remember {
+        listOf(
+            "Yêu thích",
+            "Playlist của tôi",
+            "Nhạc buồn",
+            "Nhạc vui",
+            "Tập trung",
+            "Thư giãn"
+        )
+    }
+
+    var selectedCollection by remember { mutableStateOf<String?>(null) }
+    var showNewCollectionField by remember { mutableStateOf(false) }
+    var newCollectionName by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF282828),
+        shape = RoundedCornerShape(16.dp),
+        title = {
+            Column {
+                Text(
+                    "Thêm vào bộ sưu tập",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Chọn hoặc tạo bộ sưu tập mới",
+                    color = Color.Gray,
+                    fontSize = 13.sp
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Hiển thị thông tin bài hát
+                currentSong?.let { song ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF1E1E1E)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(50.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color(0xFF404040)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (!song.imageUrl.isNullOrEmpty()) {
+                                    AsyncImage(
+                                        model = song.imageUrl,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Outlined.MusicNote,
+                                        contentDescription = null,
+                                        tint = Color.Gray
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    song.title,
+                                    color = Color.White,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    song.artist,
+                                    color = Color.Gray,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Divider(color = Color.Gray.copy(0.2f))
+
+                // Danh sách collection
+                LazyColumn(
+                    modifier = Modifier.height(250.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(collections) { collection ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedCollection = collection
+                                    showNewCollectionField = false
+                                },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (selectedCollection == collection)
+                                    Color(0xFF1DB954).copy(0.3f)
+                                else Color(0xFF1E1E1E)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Outlined.LibraryMusic,
+                                    contentDescription = null,
+                                    tint = if (selectedCollection == collection)
+                                        Color(0xFF1DB954)
+                                    else Color.Gray,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    collection,
+                                    color = Color.White,
+                                    fontSize = 15.sp,
+                                    fontWeight = if (selectedCollection == collection)
+                                        FontWeight.Bold
+                                    else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Divider(color = Color.Gray.copy(0.2f))
+
+                // Tạo collection mới
+                if (showNewCollectionField) {
+                    OutlinedTextField(
+                        value = newCollectionName,
+                        onValueChange = {
+                            newCollectionName = it
+                            selectedCollection = null
+                        },
+                        label = { Text("Tên bộ sưu tập mới", color = Color.Gray) },
+                        placeholder = { Text("Ví dụ: Nhạc thể thao", color = Color.Gray.copy(0.5f)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedContainerColor = Color(0xFF1E1E1E),
+                            unfocusedContainerColor = Color(0xFF1E1E1E),
+                            focusedBorderColor = Color(0xFF1DB954),
+                            unfocusedBorderColor = Color.Gray
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.LibraryAdd,
+                                contentDescription = null,
+                                tint = Color(0xFF1DB954)
+                            )
+                        }
+                    )
+                } else {
+                    Button(
+                        onClick = {
+                            showNewCollectionField = true
+                            selectedCollection = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1E1E1E)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null,
+                            tint = Color(0xFF1DB954),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Tạo bộ sưu tập mới",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    currentSong?.let { song ->
+                        val collectionToAdd = if (showNewCollectionField && newCollectionName.isNotEmpty()) {
+                            newCollectionName
+                        } else {
+                            selectedCollection
+                        }
+
+                        collectionToAdd?.let { collection ->
+                            onAddToCollection(song, collection)
+
+                            // Hiển thị thông báo
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Đã thêm vào $collection")
+                            }
+                        }
+                    }
+                },
+                enabled = selectedCollection != null || (showNewCollectionField && newCollectionName.isNotEmpty()),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1DB954),
+                    disabledContainerColor = Color.Gray.copy(0.3f)
+                ),
+                shape = RoundedCornerShape(24.dp)
+            ) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Thêm vào",
+                    color = Color.Black,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(24.dp)
+            ) {
+                Text(
+                    "Hủy",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    )
 }
 
 fun formatTime(ms: Long): String {

@@ -9,6 +9,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val PLAYLIST_ALL = "playlist_all"
 
-    // THÊM MỚI: Route cho màn hình bộ sưu tập, có tham số là chuỗi json
-    const val COLLECTION = "collection/{songsJson}"
+    // ✅ Route cơ bản cho Collection (không tham số)
+    const val COLLECTIONS = "collections"   // Màn hình danh sách bộ sưu tập
+    const val COLLECTION = "collection"     // Màn hình chi tiết bộ sưu tập
 }
