@@ -22,7 +22,7 @@ object OtpApi {
     // - 10.0.2.2:3000 nếu dùng Android Emulator
     // - IP máy tính thật trên mạng LAN nếu dùng thiết bị thật
     // - URL domain thật nếu đã deploy lên server
-    private const val BASE_URL = "http://192.168.100.161:3000"
+    private const val BASE_URL = "http://backend.ngocanh648.id.vn:3000"
 
     fun sendOtp(email: String): Boolean {
         return try {

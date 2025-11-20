@@ -37,7 +37,8 @@ fun SearchScreen(
     var allSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var filteredSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    val scope = rememberCoroutineScope()
+    var showVoiceSearch by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     // Load songs from Firestore
     LaunchedEffect(Unit) {
@@ -48,6 +49,8 @@ fun SearchScreen(
                 doc.toObject(Song::class.java)
             }
             filteredSongs = allSongs
+        } catch (e: Exception) {
+            errorMessage = "Lỗi tải danh sách bài hát: ${e.message}"
         } finally {
             isLoading = false
         }
@@ -66,135 +69,199 @@ fun SearchScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Tìm kiếm", color = Color.White, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+        containerColor = Color(0xFF0D0D0D),
+        snackbarHost = {
+            SnackbarHost(
+                hostState = remember { SnackbarHostState() }.apply {
+                    LaunchedEffect(errorMessage) {
+                        errorMessage?.let {
+                            showSnackbar(
+                                message = it,
+                                duration = SnackbarDuration.Short
+                            )
+                        }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF0D0D0D)
-                )
+                }
             )
-        },
-        containerColor = Color(0xFF0D0D0D)
+        }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
+                .padding(padding)
         ) {
-            // Search Bar
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .shadow(8.dp, RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF1a1a1a)
-                )
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = {
-                        Text(
-                            "Tìm kiếm bài hát, ca sĩ...",
-                            color = Color.White.copy(alpha = 0.5f)
-                        )
-                    },
-                    leadingIcon = {
+                // ===== Top Bar with Search and Mic Button =====
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Back Button
+                    IconButton(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier.size(48.dp)
+                    ) {
                         Icon(
-                            Icons.Default.Search,
-                            contentDescription = null,
-                            tint = Color(0xFF1DB954)
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
                         )
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
+                    }
+
+                    // Search Bar (without mic inside)
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .shadow(8.dp, RoundedCornerShape(24.dp)),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF1a1a1a)
+                        )
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = {
+                                Text(
+                                    "Tìm kiếm...",
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontSize = 15.sp
+                                )
+                            },
+                            leadingIcon = {
                                 Icon(
-                                    Icons.Default.Clear,
-                                    contentDescription = "Clear",
-                                    tint = Color.White.copy(alpha = 0.6f)
+                                    Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = Color(0xFF1DB954),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(
+                                            Icons.Default.Clear,
+                                            contentDescription = "Clear",
+                                            tint = Color.White.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(24.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                cursorColor = Color(0xFF1DB954)
+                            )
+                        )
+                    }
+
+                    // Voice Search Button (Outside, separate hitbox)
+                    FloatingActionButton(
+                        onClick = { showVoiceSearch = true },
+                        containerColor = Color(0xFF1DB954),
+                        contentColor = Color.White,
+                        modifier = Modifier.size(48.dp),
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = "Voice Search",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // ===== Search Results =====
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = Color(0xFF1DB954),
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                } else if (filteredSongs.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.SearchOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(80.dp),
+                                tint = Color.White.copy(alpha = 0.3f)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                if (searchQuery.isBlank()) "Tìm kiếm bài hát"
+                                else "Không tìm thấy kết quả",
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            if (searchQuery.isBlank()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "Nhập tên bài hát hoặc nghệ sĩ",
+                                    color = Color.White.copy(alpha = 0.4f),
+                                    fontSize = 14.sp
                                 )
                             }
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        cursorColor = Color(0xFF1DB954)
-                    )
-                )
-            }
-
-            // Results
-            if (isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = Color(0xFF1DB954),
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
-            } else if (filteredSongs.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Default.SearchOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(80.dp),
-                            tint = Color.White.copy(alpha = 0.3f)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            if (searchQuery.isBlank()) "Nhập từ khóa để tìm kiếm"
-                            else "Không tìm thấy kết quả",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 16.sp
-                        )
                     }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    item {
-                        Text(
-                            "Kết quả tìm kiếm (${filteredSongs.size})",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            Text(
+                                "Kết quả tìm kiếm (${filteredSongs.size})",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
 
-                    items(filteredSongs) { song ->
-                        SearchResultItem(song) {
-                            playerVM.setPlaylist(filteredSongs, filteredSongs.indexOf(song))
+                        items(filteredSongs) { song ->
+                            SearchResultItem(song) {
+                                playerVM.setPlaylist(filteredSongs, filteredSongs.indexOf(song))
+                            }
                         }
                     }
                 }
+            }
+
+            // ===== Voice Search Dialog =====
+            if (showVoiceSearch) {
+                VoiceSearchDialog(
+                    onDismiss = { showVoiceSearch = false },
+                    onResult = { result ->
+                        searchQuery = result
+                        showVoiceSearch = false
+                    }
+                )
             }
         }
     }

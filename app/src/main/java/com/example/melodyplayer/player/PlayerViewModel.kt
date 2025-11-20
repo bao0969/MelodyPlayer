@@ -436,6 +436,29 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             mediaItem
         }
     }
+    // ======================= SLEEP TIMER ==========================
+    private var sleepJob: Job? = null
+    private val _sleepEndTime = MutableStateFlow<Long?>(null)
+    val sleepEndTime: StateFlow<Long?> = _sleepEndTime.asStateFlow()
+
+    fun startSleepTimer(durationMillis: Long) {
+        sleepJob?.cancel()
+
+        val endTime = System.currentTimeMillis() + durationMillis
+        _sleepEndTime.value = endTime
+
+        sleepJob = viewModelScope.launch {
+            delay(durationMillis)
+            controller?.pause()      // dừng nhạc
+            _sleepEndTime.value = null
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepJob?.cancel()
+        _sleepEndTime.value = null
+    }
+// ==============================================================
 
     override fun onCleared() {
         super.onCleared()
